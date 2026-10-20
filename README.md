@@ -14,7 +14,17 @@ pip install -e /Users/klg/Documents/GItHub/data_factories
 pip install -e "/Users/klg/Documents/GItHub/data_factories[demos]"
 ```
 
-Consumers (Blackstone wrappers, FinOps/GEV demos) expect this editable install on `PYTHONPATH`.
+Or install from a consumer `requirements.txt` that already lists `-e …/data_factories`.
+
+## Consumers (repointed)
+
+| Consumer | How it uses this package |
+|----------|--------------------------|
+| [`customers/blackstone`](../customers/blackstone) | Thin wrappers under `elastic/*/data_factories/`; `requirements.txt` → `-e ../../data_factories` |
+| [`demos/cloud&llm_cost_modeling`](../demos/cloud&llm_cost_modeling) | `src/generators` + `src/world` shims → `data_factories.finops.*` |
+| [`demos/gev_wkst1`](../demos/gev_wkst1) | Same pattern → `data_factories.gev.*` |
+| FinOps `variants/*` | Same shims; requirements → `-e ../../../../data_factories` |
+| [`skills/…/splunk-xml-to-kibana`](../skills/skills/splunk-xml-to-kibana) | Skill docs point new factories here |
 
 ## Blackstone CLI
 
