@@ -1,0 +1,24 @@
+# Generated factory output
+**/out/
+*.ndjson
+
+# Secrets / env
+.env
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.log

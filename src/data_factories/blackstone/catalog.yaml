@@ -1,0 +1,232 @@
+# Consolidated into data_factories package; Blackstone keeps thin wrappers.
+# Blackstone POC — data factories for steve_dashboard / DNS Hunt use case
+# Target: klgdimapoc (serverless 9.6) from project .env
+#
+# Priority: P0 = required for current dashboard, P1 = next panels, P2 = scale/realism
+
+use_case: steve_dashboard_dns_hunt
+dashboard_id: bx-dns-hunt-dashboard
+splunk_sources:
+  dns_cim:
+    datamodel: Network_Resolution.DNS
+    index: bx_sec_msad_prod
+    sourcetype: MSAD:NT6:DNS
+  hunt_lookup:
+    name: hunt_task
+    type: kvstore
+    fields: [ip]
+  network_traffic_cim: # steve_dashboard scratch queries 2–3
+    datamodel: Network_Traffic.All_Traffic
+    indexes:
+      - bx_app_aws_vpcflowlogs
+      - bx_sec_paloalto_prod
+      - bx_sec_zscaler_prod
+      - bx_sec_cloudgenix_prod
+
+factories:
+
+  - id: hunt_ioc_factory
+    priority: P0
+    purpose: Maintain IOC IP list that LOOKUP JOIN / ENRICH filter on
+    writes:
+      - index: bx-hunt-task
+      - index: bx-hunt-task-lookup   # index.mode=lookup
+    side_effects:
+      - enrich_policy: bx-hunt-task-policy  # re-execute after bulk
+    ecs_schema:
+      ip: ip
+      hunt_name: keyword
+      source: keyword
+      "@timestamp": date
+    generators:
+      - static_from: elastic/dns_hunt/hunt_task_ips.json  # 71 Splunk IPs
+      - mutate: add_remove_ips_for_demo_churn
+    rate: on_demand | every_15m
+    status: implemented_in_setup_dns_hunt
+
+  - id: windows_dns_factory
+    priority: P0
+    purpose: Populate DNS questions from hunt IPs (and noise hosts)
+    writes:
+      - data_stream: logs-bx.dns-default
+    ecs_schema:
+      "@timestamp": date
+      event.category: [network]
+      event.dataset: bx.dns
+      dns.question.name: keyword
+      dns.question.type: keyword
+      source.ip: ip
+      destination.ip: ip
+      host.name: keyword
+      observer.vendor: Microsoft
+      observer.product: Windows DNS
+    profiles:
+      - name: benign_corp
+        weight: 0.7
+        queries:
+          - update.microsoft.com
+          - login.microsoftonline.com
+          - ocsp.digicert.com
+          - cdn.blackstone.com
+          - ntp.ubuntu.com
+      - name: suspicious
+        weight: 0.2
+        queries:
+          - suspicious-c2.example
+          - malicious-beacon.badactor.tld
+          - dga-like-xk7qp2.example
+      - name: noise_non_hunt
+        weight: 0.1
+        source_ips: random_rfc1918_not_in_hunt_list
+    source_ip_pools:
+      hunt: elastic/dns_hunt/hunt_task_ips.json   # must dominate for panels to light up
+      noise: generate_private_ips(count=50)
+    rate: 5-50 events/sec burstable
+    status: implemented_in_dns_hunt
+
+  - id: dns_storyline_factory
+    priority: P0
+    purpose: Scripted demo narrative (beaconing / spray) for walkthroughs
+    depends_on: [hunt_ioc_factory, windows_dns_factory]
+    scenarios:
+      - id: single_host_c2
+        description: One hunt IP repeatedly queries malicious-beacon.badactor.tld
+        duration: 30m
+        interval: 60s
+      - id: shared_ioc_domain
+        description: Several hunt IPs resolve the same suspicious domain
+        duration: 1h
+      - id: newly_added_ioc
+        description: Add IP to hunt list mid-demo; DNS already flowing → panel updates after enrich/lookup refresh
+    status: planned
+
+  - id: pan_traffic_factory
+    priority: P1
+    purpose: Recreate steve_dashboard blocked/flow investigation panels
+    writes:
+      - data_stream: logs-bx.network-default
+    dashboard: bx-network-hunt-dashboard
+    maps_from_splunk: pan:traffic
+    ecs_schema:
+      source.ip: ip
+      destination.ip: ip
+      source.port: long
+      destination.port: long
+      event.action: keyword          # allow | deny | drop
+      network.bytes: long
+      network.transport: keyword
+      observer.ingress.interface.name: keyword
+      cloud.account.id: keyword
+    seed_scenarios:
+      - src: 10.226.65.68
+        dest: 110.191.200.13
+        action: deny
+      - dest: 10.191.200.135
+        dest_port: 10000
+        action: allow
+        exclude_action: teardown
+    status: implemented
+    scripts:
+      - elastic/network_hunt/setup_network_hunt.py
+      - data_factories.blackstone.dns_hunt --pan (via Blackstone wrapper)
+
+  - id: aws_vpcflow_factory
+    priority: P1
+    purpose: High-volume Network_Traffic analogue (largest Splunk volume)
+    writes:
+      - data_stream: logs-aws.vpcflow-default
+    maps_from_splunk: aws:cloudwatchlogs:vpcflow
+    note: Keep POC volume low (sampled); production uses Elastic AWS integration
+    status: planned
+
+  - id: zscaler_fw_factory
+    priority: P2
+    purpose: Alternate Network_Traffic / Web path for Zscaler NSS
+    writes:
+      - data_stream: logs-zscaler.firewall-default
+    maps_from_splunk: zscalernss-fw
+    status: planned
+
+  - id: zscaler_dns_factory
+    priority: P2
+    purpose: Optional DNS beyond MSAD (not in Splunk CIM Network_Resolution macro)
+    writes:
+      - data_stream: logs-zscaler.dns-default
+    maps_from_splunk: zscalercc-dns
+    note: Extend dashboard FROM clause if included
+    status: planned
+
+  - id: employee_safety_factory
+    priority: P1
+    purpose: Badge + Meraki + Teams presence for Employee Safety / emergency accountability
+    writes:
+      - data_stream: logs-bx.badge-default
+      - data_stream: logs-bx.meraki-default
+      - data_stream: logs-bx.o365-default
+      - data_stream: metrics-bx.employee_presence-default
+    lookups:
+      - bx-lookup-physical-access-readers
+      - bx-lookup-meraki-inventory
+      - bx-lookup-cmdb-mobile-devices
+      - bx-lookup-identities
+      - bx-lookup-office-timezones
+      - bx-lookup-meraki-work-iphone-presence
+    dashboard: bx-employee-safety-dashboard
+    maps_from_splunk:
+      dashboard: employee_safety_dashboard
+      indexes: [bx_sec_badge_prod, bx_sec_meraki_prod, bx_app_azure_prod]
+    status: packaged_offline
+    scripts:
+      - elastic/employee_safety/setup_employee_safety.py
+      - data_factories.blackstone.employee_safety (wrapper: elastic/employee_safety/data_factories/)
+
+
+  - id: hdsi_user_factory
+    priority: P1
+    purpose: HDSI user investigation CIM-style streams + identity lookup
+    dashboard: bx-hdsi-user-investigation
+    status: packaged_offline
+    scripts:
+      - data_factories.blackstone.hdsi_user
+
+  - id: ioc_threat_hunt_factory
+    priority: P1
+    purpose: Multi-channel IOC hunt hits + notables
+    dashboard: bx-ioc-threat-hunt
+    status: packaged_offline
+    scripts:
+      - data_factories.blackstone.ioc_hunt
+
+  - id: network_egress_exfil_factory
+    priority: P1
+    purpose: Egress spike traffic + public IP / 24h outbound lookups
+    dashboard: bx-network-egress-exfil
+    status: packaged_offline
+    scripts:
+      - data_factories.blackstone.egress_exfil
+
+  - id: aws_blast_radius_factory
+    priority: P1
+    purpose: VPC flow + CloudTrail centrality for blast-radius panels
+    dashboard: bx-aws-blast-radius
+    status: packaged_offline
+    scripts:
+      - data_factories.blackstone.blast_radius
+
+recommended_build_order:
+  - hunt_ioc_factory
+  - windows_dns_factory
+  - dns_storyline_factory
+  - pan_traffic_factory
+  - employee_safety_factory
+  - aws_vpcflow_factory
+  - zscaler_*
+
+production_onboarding_vs_factory:
+  preferred_long_term:
+    - Elastic Agent / Fleet integrations (Windows, AWS, Palo Alto, Zscaler)
+    - Sync hunt_task from SOAR/ticketing into bx-hunt-task via connector or Logstash
+  factories_for:
+    - Empty POC clusters
+    - Demos / workshops
+    - CI validation of dashboards without customer data
