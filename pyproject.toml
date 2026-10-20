@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "data-factories"
 version = "0.1.0"
-description = "Shared Elastic synthetic data factories (Blackstone NDJSON + ELK Co FinOps/GEV generators)"
+description = "Shared Elastic synthetic data factories, grouped by the data they produce"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
@@ -17,16 +17,14 @@ dependencies = [
 demos = ["requests>=2.28"]
 
 [project.scripts]
-df-bx-dns-hunt = "data_factories.blackstone.dns_hunt:main"
-df-bx-sync-hunt-iocs = "data_factories.blackstone.sync_hunt_iocs:main"
-df-bx-employee-safety = "data_factories.blackstone.employee_safety:main"
-df-bx-hdsi-user = "data_factories.blackstone.hdsi_user:main"
-df-bx-ioc-hunt = "data_factories.blackstone.ioc_hunt:main"
-df-bx-egress-exfil = "data_factories.blackstone.egress_exfil:main"
-df-bx-blast-radius = "data_factories.blackstone.blast_radius:main"
+df-dns-hunt = "data_factories.network.dns_hunt:main"
+df-egress-exfil = "data_factories.network.egress_exfil:main"
+df-ioc-hunt = "data_factories.threat_intel.ioc_hunt:main"
+df-sync-hunt-iocs = "data_factories.threat_intel.sync_hunt_iocs:main"
+df-hdsi-user = "data_factories.identity.hdsi_user:main"
+df-employee-safety = "data_factories.identity.employee_safety:main"
+df-aws-blast-radius = "data_factories.cloud_audit.aws_blast_radius:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.setuptools.package-data]
-"data_factories.blackstone" = ["*.yaml"]

@@ -1,10 +1,6 @@
 # data_factories
 
-Shared Elastic synthetic data factories:
-
-- **Blackstone** — NDJSON generators for Splunk→Kibana dashboard POCs (DNS hunt, employee safety, HDSI, IOC hunt, egress exfil, AWS blast radius)
-- **FinOps** — ELK Co cloud & LLM cost-modeling generators + world model
-- **GEV** — Elastic Co. observability workshop generators + world model
+Shared Elastic synthetic data factories, grouped by the data they produce.
 
 ## Install
 
@@ -16,38 +12,64 @@ pip install -e "/Users/klg/Documents/GItHub/data_factories[demos]"
 
 Or install from a consumer `requirements.txt` that already lists `-e …/data_factories`.
 
-## Consumers (repointed)
-
-| Consumer | How it uses this package |
-|----------|--------------------------|
-| [`customers/blackstone`](../customers/blackstone) | Thin wrappers under `elastic/*/data_factories/`; `requirements.txt` → `-e ../../data_factories` |
-| [`demos/cloud&llm_cost_modeling`](../demos/cloud&llm_cost_modeling) | `src/generators` + `src/world` shims → `data_factories.finops.*` |
-| [`demos/gev_wkst1`](../demos/gev_wkst1) | Same pattern → `data_factories.gev.*` |
-| FinOps `variants/*` | Same shims; requirements → `-e ../../../../data_factories` |
-| [`skills/…/splunk-xml-to-kibana`](../skills/skills/splunk-xml-to-kibana) | Skill docs point new factories here |
-
-## Blackstone CLI
-
-```bash
-df-bx-hdsi-user --out ./out
-df-bx-employee-safety --lookups /path/to/employee_safety/lookups --out ./out
-df-bx-dns-hunt --hunt-ips /path/to/hunt_task_ips.json --env-file /path/to/.env
-```
-
-Or: `python -m data_factories.blackstone.hdsi_user`.
-
-Generated NDJSON under `out/` is gitignored — regenerate before `setup_*.py` bulk.
-
-## FinOps / GEV
-
-Demos keep CLI, setup, sink, and `config/world.yaml`. They import generators via thin `src.generators` / `src.world` shims that re-export from this package.
-
 ## Layout
 
 ```text
 src/data_factories/
-  es.py              # REST + NDJSON helpers
-  blackstone/        # NDJSON factories + catalog.yaml
-  finops/            # generators/ + world/
-  gev/               # generators/ + world/
+  es.py              ES REST + NDJSON helpers
+  common.py          Beats-style doc builders, time/count helpers
+  service_common.py  microservice telemetry helpers (labels, data_stream meta)
+  service_streams.py microservice data stream names
+
+  cloud_billing/     aws_billing, aws_billing_cur, azure_billing, gcp_billing,
+                     ess_billing, ess_billing_credits
+  cloud_metrics/     aws_ec2_metrics, aws_usage (RDS, Lambda, S3 storage, MQ,
+                     CloudWatch usage, kubeletstats)
+  cloud_audit/       aws_cloudtrail, aws_guardduty, aws_s3access, azure_activity,
+                     gcp_audit, aws_blast_radius (CloudTrail + VPC flow)
+  llm/               openai, anthropic, bedrock, azure_openai, vertexai, elastic_ai
+  apm/               service_traces, service_deps, llm_traces
+  kubernetes/        pods_events (pod metrics, k8s events), hosts_nodes
+  app_logs/          service_logs, orchestrator
+  network/           dns_hunt, egress_exfil
+  threat_intel/      ioc_hunt, sync_hunt_iocs
+  identity/          hdsi_user, employee_safety (badge, Meraki, Teams presence)
+
+  world/             scenario models that drive the generators
+                     cloud_org, cloud_scenarios, cloud_costs, llm_catalog,
+                     llm_traffic, microservices, runtime
+  presets/           generator selections demos use
+                     cost_modeling (NAMED, select(scope)), o11y_workshop (GENERATORS, select)
 ```
+
+## Consumers
+
+| Consumer | How it uses this package |
+|----------|--------------------------|
+| [`demos/cloud&llm_cost_modeling`](../demos/cloud&llm_cost_modeling) (+ `variants/*`) | `src/generators` + `src/world` shims → `presets.cost_modeling` and the domain modules |
+| [`demos/gev_wkst1`](../demos/gev_wkst1) | Same pattern → `presets.o11y_workshop`, `apm`, `kubernetes`, `app_logs`, `world.microservices` |
+| [`customers/blackstone`](../customers/blackstone) | Thin wrappers under `elastic/*/data_factories/`; catalog in `elastic/data_factories/factories.yaml` |
+| [`skills/…/splunk-xml-to-kibana`](../skills/skills/splunk-xml-to-kibana) | Skill docs point new factories here |
+
+## CLIs
+
+```bash
+df-hdsi-user --out ./out
+df-employee-safety --lookups /path/to/employee_safety/lookups --out ./out
+df-dns-hunt --hunt-ips /path/to/hunt_task_ips.json --env-file /path/to/.env
+df-sync-hunt-iocs --hunt-ips ... --env-file ...
+df-ioc-hunt --out ./out
+df-egress-exfil --out ./out
+df-aws-blast-radius --out ./out
+```
+
+Or: `python -m data_factories.identity.hdsi_user`.
+
+Generated NDJSON under `out/` is gitignored — regenerate before `setup_*.py` bulk.
+
+## World config
+
+World models read their config from the calling demo (`src.config.WORLD_CONFIG`) or from env:
+
+- `FINOPS_WORLD_CONFIG`, `FINOPS_ROOT` — `world.cloud_org` and friends
+- `GEV_WORLD_CONFIG` — `world.microservices`
