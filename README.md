@@ -1,7 +1,7 @@
 # data_factories
 
 Shared Elastic synthetic data factories, grouped by the data they produce.
-Customer-neutral by default — no hard-coded tenant brands.
+Tenant-neutral by default — no hard-coded org brands.
 
 ## Install
 
@@ -28,16 +28,16 @@ Requires Python ≥ 3.11. Core deps: `PyYAML`, `requests`.
 ## Tenant naming (portability)
 
 All stream names, tags, lookup filenames, and custom document fields use a
-**tenant slug** (default `customer`):
+**tenant slug** (default `demo`):
 
 | Kind | Example (default) |
 |------|-------------------|
-| POC tag | `customer-poc` |
-| Dataset | `customer.hdsi_auth` |
-| Data stream | `logs-customer.badge-default` |
-| NDJSON out | `logs-customer.ioc_hunt.ndjson` |
-| Lookup file | `customer-identities.ndjson` |
-| Nested custom field | `customer: { … }` |
+| POC tag | `demo-poc` |
+| Dataset | `demo.hdsi_auth` |
+| Data stream | `logs-demo.badge-default` |
+| NDJSON out | `logs-demo.ioc_hunt.ndjson` |
+| Lookup file | `demo-identities.ndjson` |
+| Nested custom field | `demo: { … }` |
 
 Override with env:
 
@@ -77,8 +77,8 @@ These need extra inputs and/or ES credentials:
 
 ```bash
 df-employee-safety --lookups /path/to/lookups --out ./out
-# lookups must include: customer-identities.ndjson,
-#   customer-physical-access-readers.ndjson, customer-meraki-inventory.ndjson
+# lookups must include: demo-identities.ndjson,
+#   demo-physical-access-readers.ndjson, demo-meraki-inventory.ndjson
 # (names follow DATA_FACTORIES_TENANT)
 
 df-dns-hunt --hunt-ips ./hunt_task_ips.json --env-file ./.env

@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
             "email": DEMO_EMAIL,
             "first": "Alex",
             "last": "Analyst",
-            "bunit": "Customer Security Operations",
+            "bunit": "Security Operations",
             "category": "employee",
             "managedBy": email("manager.demo"),
             "work_city": "New York",
