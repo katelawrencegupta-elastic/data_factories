@@ -63,19 +63,6 @@ src/data_factories/
 | [`demos/cloud&llm_cost_modeling`](../demos/cloud&llm_cost_modeling) (+ `variants/*`) | `src/generators` + `src/world` shims → `presets.cost_modeling` and the domain modules |
 | [`skills/…/splunk-xml-to-kibana`](../skills/skills/splunk-xml-to-kibana) | Skill docs point new factories here |
 
-## CLIs
-
-```bash
-df-hdsi-user --out ./out
-df-employee-safety --lookups /path/to/employee_safety/lookups --out ./out
-df-dns-hunt --hunt-ips /path/to/hunt_task_ips.json --env-file /path/to/.env
-df-sync-hunt-iocs --hunt-ips ... --env-file ...
-df-ioc-hunt --out ./out
-df-egress-exfil --out ./out
-df-aws-blast-radius --out ./out
-```
-
-Or: `python -m data_factories.identity.hdsi_user`.
 
 Generated NDJSON under `out/` is gitignored — regenerate before `setup_*.py` bulk.
 
@@ -84,4 +71,3 @@ Generated NDJSON under `out/` is gitignored — regenerate before `setup_*.py` b
 World models read their config from the calling demo (`src.config.WORLD_CONFIG`) or from env:
 
 - `FINOPS_WORLD_CONFIG`, `FINOPS_ROOT` — `world.cloud_org` and friends
-- `GEV_WORLD_CONFIG` — `world.microservices`
