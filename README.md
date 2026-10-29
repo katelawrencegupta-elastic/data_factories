@@ -62,7 +62,7 @@ src/data_factories/
 |----------|--------------------------|
 | [`demos/cloud&llm_cost_modeling`](../demos/cloud&llm_cost_modeling) (+ `variants/*`) | `src/generators` + `src/world` shims → `presets.cost_modeling` and the domain modules |
 | [`demos/gev_wkst1`](../demos/gev_wkst1) | Same pattern → `presets.o11y_workshop`, `apm`, `kubernetes`, `app_logs`, `world.microservices` |
-| [`customers/blackstone`](../customers/blackstone) | Thin wrappers under `elastic/*/data_factories/`; catalog in `elastic/data_factories/factories.yaml` |
+| [`customers/blackstone`](../customers/<name>) | Thin wrappers under `elastic/*/data_factories/`; catalog in `elastic/data_factories/factories.yaml` |
 | [`skills/…/splunk-xml-to-kibana`](../skills/skills/splunk-xml-to-kibana) | Skill docs point new factories here |
 
 ## CLIs
