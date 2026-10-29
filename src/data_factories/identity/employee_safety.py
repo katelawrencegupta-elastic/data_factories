@@ -20,6 +20,15 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from data_factories.es import load_env, load_ndjson, require_es, write_ndjson
+from data_factories.tenant import (
+    TENANT,
+    dataset,
+    lookup_file,
+    ndjson_logs,
+    ndjson_metrics,
+    poc_tag,
+    stream_name,
+)
 
 random.seed(7)
 
@@ -43,10 +52,10 @@ def _office_aps(meraki_aps: list[dict]) -> dict[str, list]:
 def _badge_doc(ident: dict, reader: dict, ts: datetime, admitted: bool = True) -> dict:
     return {
         "@timestamp": ts.isoformat(),
-        "data_stream": {"type": "logs", "dataset": "bx.badge", "namespace": "default"},
+        "data_stream": {"type": "logs", "dataset": dataset('badge'), "namespace": "default"},
         "event": {
             "category": ["physical"],
-            "dataset": "bx.badge",
+            "dataset": dataset('badge'),
             "kind": "event",
             "type": ["access"],
             "action": "badge_in",
@@ -63,7 +72,7 @@ def _badge_doc(ident: dict, reader: dict, ts: datetime, admitted: bool = True) -
             "product": "CCure",
             "name": reader.get("inbound_reader"),
         },
-        "bx": {
+        TENANT: {
             "badge": {
                 "entrance": reader.get("reader_name"),
                 "location": reader.get("description"),
@@ -73,17 +82,17 @@ def _badge_doc(ident: dict, reader: dict, ts: datetime, admitted: bool = True) -
                 "timestamp_raw": ts.strftime("%Y-%m-%d %H:%M:%S"),
             }
         },
-        "tags": ["bx-poc", "employee-safety", "badge", "backfill"],
+        "tags": [poc_tag(), "employee-safety", "badge", "backfill"],
     }
 
 
 def _meraki_doc(ident: dict, ap: dict, ts: datetime, action: str, status: str) -> dict:
     return {
         "@timestamp": ts.isoformat(),
-        "data_stream": {"type": "logs", "dataset": "bx.meraki", "namespace": "default"},
+        "data_stream": {"type": "logs", "dataset": dataset('meraki'), "namespace": "default"},
         "event": {
             "category": ["network", "session"],
-            "dataset": "bx.meraki",
+            "dataset": dataset('meraki'),
             "kind": "event",
             "type": ["connection"],
             "action": action,
@@ -91,7 +100,7 @@ def _meraki_doc(ident: dict, ap: dict, ts: datetime, action: str, status: str) -
         "source": {"mac": ident.get("mac_address")},
         "user": {"email": ident["email"]},
         "observer": {"name": ap.get("ap_name")},
-        "bx": {
+        TENANT: {
             "meraki": {
                 "access_point": ap.get("ap_name"),
                 "floor": ap.get("floor"),
@@ -100,17 +109,17 @@ def _meraki_doc(ident: dict, ap: dict, ts: datetime, action: str, status: str) -
                 "building_status": status,
             }
         },
-        "tags": ["bx-poc", "employee-safety", "meraki", "backfill"],
+        "tags": [poc_tag(), "employee-safety", "meraki", "backfill"],
     }
 
 
 def _teams_doc(ident: dict, ts: datetime) -> dict:
     return {
         "@timestamp": ts.isoformat(),
-        "data_stream": {"type": "logs", "dataset": "bx.o365", "namespace": "default"},
+        "data_stream": {"type": "logs", "dataset": dataset('o365'), "namespace": "default"},
         "event": {
             "category": ["collaboration"],
-            "dataset": "bx.o365.teams",
+            "dataset": dataset('o365') + '.teams',
             "kind": "event",
             "type": ["info"],
             "action": random.choice(
@@ -118,7 +127,7 @@ def _teams_doc(ident: dict, ts: datetime) -> dict:
             ),
         },
         "user": {"email": ident["email"], "name": ident["email"]},
-        "tags": ["bx-poc", "employee-safety", "teams", "backfill"],
+        "tags": [poc_tag(), "employee-safety", "teams", "backfill"],
     }
 
 
@@ -268,8 +277,8 @@ def build_presence(
         )
         active = present or (t_ts is not None and t_ts >= lookback)
 
-        swiped = (b or {}).get("bx", {}).get("badge", {}).get("office")
-        meraki_office = (m or {}).get("bx", {}).get("meraki", {}).get("office")
+        swiped = (b or {}).get(TENANT, {}).get("badge", {}).get("office")
+        meraki_office = (m or {}).get(TENANT, {}).get("meraki", {}).get("office")
         if b_ts and m_ts:
             last_office = swiped if b_ts >= m_ts else meraki_office
         else:
@@ -277,26 +286,26 @@ def build_presence(
 
         short = None
         if b and b_ts and (not m_ts or b_ts >= m_ts):
-            short = b["bx"]["badge"].get("office_short")
+            short = b[TENANT]["badge"].get("office_short")
         elif m:
-            short = m["bx"]["meraki"].get("office_short")
+            short = m[TENANT]["meraki"].get("office_short")
 
         out.append(
             {
                 "@timestamp": now.isoformat(),
                 "data_stream": {
                     "type": "metrics",
-                    "dataset": "bx.employee_presence",
+                    "dataset": dataset('employee_presence'),
                     "namespace": "default",
                 },
-                "event": {"dataset": "bx.employee_presence", "kind": "metric"},
+                "event": {"dataset": dataset('employee_presence'), "kind": "metric"},
                 "user": {
                     "email": email,
                     "first_name": ident["first"],
                     "last_name": ident["last"],
                     "full_name": f"{ident['last']}, {ident['first']}",
                 },
-                "bx": {
+                TENANT: {
                     "presence": {
                         "present": present,
                         "active": active,
@@ -309,19 +318,19 @@ def build_presence(
                         "meraki_last": m_ts.isoformat() if m_ts else None,
                         "teams_last": t_ts.isoformat() if t_ts else None,
                         "badge_entrance": (b or {})
-                        .get("bx", {})
+                        .get(TENANT, {})
                         .get("badge", {})
                         .get("entrance"),
                         "meraki_ap": (m or {})
-                        .get("bx", {})
+                        .get(TENANT, {})
                         .get("meraki", {})
                         .get("access_point"),
                         "meraki_floor": (m or {})
-                        .get("bx", {})
+                        .get(TENANT, {})
                         .get("meraki", {})
                         .get("floor"),
                         "building_status": (m or {})
-                        .get("bx", {})
+                        .get(TENANT, {})
                         .get("meraki", {})
                         .get("building_status"),
                         "teams_last_action": (t or {}).get("event", {}).get("action"),
@@ -329,7 +338,7 @@ def build_presence(
                         "employee_category": ident.get("category"),
                     }
                 },
-                "tags": ["bx-poc", "employee-safety", "presence"],
+                "tags": [poc_tag(), "employee-safety", "presence"],
             }
         )
     return out
@@ -411,7 +420,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--lookups",
         type=Path,
-        help="Directory with bx-identities / readers / meraki NDJSON lookups",
+        help="Directory with customer-identities / readers / meraki NDJSON lookups",
     )
     ap.add_argument(
         "--package-root",
@@ -429,9 +438,9 @@ def main(argv: list[str] | None = None) -> int:
     else:
         raise SystemExit("Pass --lookups DIR or --package-root DIR (employee_safety package)")
 
-    identities = load_ndjson(look / "bx-identities.ndjson")
-    readers = load_ndjson(look / "bx-physical-access-readers.ndjson")
-    meraki = load_ndjson(look / "bx-meraki-inventory.ndjson")
+    identities = load_ndjson(look / lookup_file('identities'))
+    readers = load_ndjson(look / lookup_file('physical-access-readers'))
+    meraki = load_ndjson(look / lookup_file('meraki-inventory'))
 
     print(f"Generating {args.days} days of activity for {len(identities)} identities…")
     badge, meraki_docs, teams = gen_backfill(identities, readers, meraki, days=args.days)
@@ -445,19 +454,19 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     out = args.out
-    write_ndjson(out / "logs-bx.badge.ndjson", badge)
-    write_ndjson(out / "logs-bx.meraki.ndjson", meraki_docs)
-    write_ndjson(out / "logs-bx.o365.ndjson", teams)
-    write_ndjson(out / "metrics-bx.employee_presence.ndjson", presence)
+    write_ndjson(out / ndjson_logs('badge'), badge)
+    write_ndjson(out / ndjson_logs('meraki'), meraki_docs)
+    write_ndjson(out / ndjson_logs('o365'), teams)
+    write_ndjson(out / ndjson_metrics('employee_presence'), presence)
 
     if args.push:
         env = load_env(args.env_file) if args.env_file else load_env()
         url, key = require_es(env)
         for idx, docs in [
-            ("logs-bx.badge-default", badge),
-            ("logs-bx.meraki-default", meraki_docs),
-            ("logs-bx.o365-default", teams),
-            ("metrics-bx.employee_presence-default", presence),
+            (stream_name('logs', 'badge'), badge),
+            (stream_name('logs', 'meraki'), meraki_docs),
+            (stream_name('logs', 'o365'), teams),
+            (stream_name('metrics', 'employee_presence'), presence),
         ]:
             ensure_data_stream(url, key, idx)
             push_bulk_chunked(url, key, idx, docs, chunk_size=args.chunk_size)

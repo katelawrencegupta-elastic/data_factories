@@ -9,6 +9,16 @@ import random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from data_factories.tenant import (
+    TENANT,
+    alias,
+    dataset,
+    lookup_file,
+    ndjson_logs,
+    poc_tag,
+    public_ips_field,
+)
+
 # Hosts that should surface as spikes (today >> 3× weekly avg)
 SPIKE_HOSTS = [
     ("10.32.8.44", 12.0, 95.0),   # weekly_avg_mb, mb_out_today
@@ -55,7 +65,7 @@ def traffic_doc(
 ) -> dict:
     return {
         "@timestamp": _ts(hours_ago),
-        "data_stream": {"type": "logs", "dataset": "bx.network_egress", "namespace": "default"},
+        "data_stream": {"type": "logs", "dataset": dataset('network_egress'), "namespace": "default"},
         "event": {
             "category": ["network"],
             "dataset": dataset,
@@ -71,15 +81,15 @@ def traffic_doc(
         },
         "rule": {"name": rule},
         "observer": {"vendor": "Palo Alto", "product": "PAN-OS"},
-        "bx": {
+        TENANT: {
             "egress": {
                 "src_zone": "trust",
                 "dest_zone": "untrust",
                 "palo_url_noise": noise,
-                "index_alias": "bx_sec_paloalto_nonprod",
+                "index_alias": alias("sec", "paloalto", "nonprod"),
             }
         },
-        "tags": ["bx-poc", "network-egress-exfil"],
+        "tags": [poc_tag(), "network-egress-exfil"],
     }
 
 
@@ -148,19 +158,19 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     # Lookups
-    public_rows = [{"ip": ip, "bx_public_ips": ip, "source": "public_ips.csv"} for ip in PUBLIC_IPS]
+    public_rows = [{'ip': ip, public_ips_field(): ip, 'source': 'public_ips.csv'} for ip in PUBLIC_IPS]
     outbound_rows = [
         {"host_ip": src, "MB_out_today": today_mb, "source": "24h_outbound_data.csv"}
         for src, _w, today_mb in SPIKE_HOSTS + BASE_HOSTS
     ]
 
-    (OUT / "logs-bx.network_egress.ndjson").write_text(
+    (OUT / ndjson_logs('network_egress')).write_text(
         "\n".join(json.dumps(d) for d in docs) + "\n"
     )
-    (OUT / "bx-lookup-public-ips.ndjson").write_text(
+    (OUT / lookup_file('lookup-public-ips')).write_text(
         "\n".join(json.dumps(d) for d in public_rows) + "\n"
     )
-    (OUT / "bx-lookup-24h-outbound.ndjson").write_text(
+    (OUT / lookup_file('lookup-24h-outbound')).write_text(
         "\n".join(json.dumps(d) for d in outbound_rows) + "\n"
     )
     print(f"Wrote {len(docs)} egress events")
