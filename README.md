@@ -4,13 +4,27 @@ Shared Elastic synthetic data factories, grouped by the data they produce.
 
 ## Install
 
+Public repo: [katelawrencegupta-elastic/data_factories](https://github.com/katelawrencegupta-elastic/data_factories).
+
 ```bash
-pip install -e /Users/klg/Documents/GItHub/data_factories
+# from GitHub (other machines / CI)
+pip install "git+https://github.com/katelawrencegupta-elastic/data_factories.git"
+
 # optional: requests for demo ensure-* helpers that still live in demos
-pip install -e "/Users/klg/Documents/GItHub/data_factories[demos]"
+pip install "data-factories[demos] @ git+https://github.com/katelawrencegupta-elastic/data_factories.git"
+
+# local editable checkout
+git clone https://github.com/katelawrencegupta-elastic/data_factories.git
+cd data_factories
+pip install -e .
+# or: pip install -e ".[demos]"
 ```
 
-Or install from a consumer `requirements.txt` that already lists `-e …/data_factories`.
+In a consumer `requirements.txt`:
+
+```text
+data-factories @ git+https://github.com/katelawrencegupta-elastic/data_factories.git
+```
 
 ## Layout
 
