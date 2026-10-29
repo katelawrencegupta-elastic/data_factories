@@ -13,8 +13,8 @@ from data_factories.tenant import TENANT, alias, dataset, ndjson_logs, poc_tag
 
 TARGET_IP = "10.40.12.88"
 ACCOUNTS = [
-    ("111122223333", "Customer-Prod-Security", "vpc-0a1b2c3d"),
-    ("444455556666", "Customer-Shared-Services", "vpc-0a1b2c3d"),
+    ("111122223333", "Demo-Prod-Security", "vpc-0a1b2c3d"),
+    ("444455556666", "Demo-Shared-Services", "vpc-0a1b2c3d"),
 ]
 DESTS = [
     ("10.40.20.11", "C1", 40),

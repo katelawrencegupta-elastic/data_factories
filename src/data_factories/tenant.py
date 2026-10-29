@@ -1,7 +1,7 @@
-"""Customer-neutral naming for streams, tags, lookups, and custom fields.
+"""Neutral naming for streams, tags, lookups, and custom fields.
 
-Override with env ``DATA_FACTORIES_TENANT`` (default ``customer``). Use a short
-lowercase slug: letters, digits, ``_``, ``-`` (e.g. ``acme``, ``demo``).
+Override with env ``DATA_FACTORIES_TENANT`` (default ``demo``). Use a short
+lowercase slug: letters, digits, ``_``, ``-`` (e.g. ``demo``, ``acme``).
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import re
 
-_DEFAULT = "customer"
+_DEFAULT = "demo"
 
 
 def _sanitize(value: str) -> str:
@@ -17,7 +17,7 @@ def _sanitize(value: str) -> str:
     if not re.fullmatch(r"[a-z][a-z0-9_-]{0,31}", v):
         raise SystemExit(
             f"Invalid DATA_FACTORIES_TENANT={value!r}; "
-            "expected a short lowercase slug (e.g. customer, acme)"
+            "expected a short lowercase slug (e.g. demo, acme)"
         )
     return v
 
@@ -30,7 +30,7 @@ def poc_tag() -> str:
 
 
 def dataset(name: str) -> str:
-    """Data-stream dataset id, e.g. ``customer.hdsi_auth``."""
+    """Data-stream dataset id, e.g. ``demo.hdsi_auth``."""
     return f"{TENANT}.{name}"
 
 
@@ -39,7 +39,7 @@ def data_stream(type_: str, name: str, namespace: str = "default") -> dict:
 
 
 def stream_name(type_: str, name: str, namespace: str = "default") -> str:
-    """Full data-stream name, e.g. ``logs-customer.badge-default``."""
+    """Full data-stream name, e.g. ``logs-demo.badge-default``."""
     return f"{type_}-{TENANT}.{name}-{namespace}"
 
 
@@ -52,7 +52,7 @@ def ndjson_metrics(name: str) -> str:
 
 
 def lookup_file(name: str) -> str:
-    """Lookup NDJSON basename, e.g. ``customer-identities.ndjson``."""
+    """Lookup NDJSON basename, e.g. ``demo-identities.ndjson``."""
     return f"{TENANT}-{name}.ndjson"
 
 
@@ -65,7 +65,7 @@ def enrich_policy(name: str) -> str:
 
 
 def alias(*parts: str) -> str:
-    """Index-alias style id, e.g. ``customer_sec_okta_prod``."""
+    """Index-alias style id, e.g. ``demo_sec_okta_prod``."""
     return "_".join((TENANT, *parts))
 
 

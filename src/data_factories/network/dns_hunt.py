@@ -37,7 +37,7 @@ BENIGN = [
     "update.microsoft.com",
     "login.microsoftonline.com",
     "ocsp.digicert.com",
-    "cdn.customer.example",
+    "cdn.demo.example",
     "ntp.ubuntu.com",
     "watson.telemetry.microsoft.com",
 ]

@@ -103,7 +103,7 @@ def emit(world, t0, t1, anchor):
         acct = world.aws_account(exp["aws_account"])
         for _ in range(poisson_count(rng, 55 * hours)):
             ts = spread(rng, t0, t1)
-            key = f"exports/customer-{rng.randint(1000, 9999)}.csv"
+            key = f"exports/object-{rng.randint(1000, 9999)}.csv"
             size = rng.randint(50_000, 8_000_000)
             yield log_doc(DATASET, ts, _line(
                 world, rng, ts, exp["bucket"], acct, "REST.GET.OBJECT", "GET",

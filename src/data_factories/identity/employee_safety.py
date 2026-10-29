@@ -420,7 +420,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--lookups",
         type=Path,
-        help="Directory with customer-identities / readers / meraki NDJSON lookups",
+        help="Directory with demo-identities / readers / meraki NDJSON lookups",
     )
     ap.add_argument(
         "--package-root",
