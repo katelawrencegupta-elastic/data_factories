@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from data_factories.es import Api, load_env, require_es
+from data_factories.tenant import enrich_policy, index_name
 
 MAPPINGS = {
     "properties": {
@@ -75,8 +76,8 @@ def load_ips(
 
 def ensure_indexes(es: Api) -> None:
     for index, settings in [
-        ("bx-hunt-task", {}),
-        ("bx-hunt-task-lookup", {"settings": {"index": {"mode": "lookup"}}}),
+        (index_name('hunt-task'), {}),
+        (index_name('hunt-task-lookup'), {"settings": {"index": {"mode": "lookup"}}}),
     ]:
         body = {"mappings": MAPPINGS, **settings}
         status, resp = es.request("PUT", f"/{index}", body)
@@ -90,7 +91,7 @@ def ensure_indexes(es: Api) -> None:
 
 def bulk_ips(es: Api, ips: list[str], provenance: str) -> None:
     now = datetime.now(timezone.utc).isoformat()
-    for index in ("bx-hunt-task", "bx-hunt-task-lookup"):
+    for index in (index_name('hunt-task'), index_name('hunt-task-lookup')):
         es.request(
             "POST",
             f"/{index}/_delete_by_query?refresh=true&conflicts=proceed",
@@ -103,7 +104,7 @@ def bulk_ips(es: Api, ips: list[str], provenance: str) -> None:
                 json.dumps(
                     {
                         "ip": ip,
-                        "hunt_name": "steve_dashboard_hunt_task",
+                        "hunt_name": "demo_hunt_task",
                         "source": provenance,
                         "updated_by": "sync_hunt_iocs",
                         "@timestamp": now,
@@ -124,10 +125,10 @@ def bulk_ips(es: Api, ips: list[str], provenance: str) -> None:
 def refresh_enrich(es: Api) -> None:
     status, body = es.request(
         "PUT",
-        "/_enrich/policy/bx-hunt-task-policy",
+        f"/_enrich/policy/{enrich_policy('hunt-task')}",
         {
             "match": {
-                "indices": "bx-hunt-task",
+                "indices": index_name('hunt-task'),
                 "match_field": "ip",
                 "enrich_fields": ["ip", "hunt_name", "source"],
             }
@@ -138,7 +139,7 @@ def refresh_enrich(es: Api) -> None:
         and body.get("error", {}).get("type") == "resource_already_exists_exception"
     ):
         print(f"enrich policy create: {status} {body}")
-    status, body = es.request("PUT", "/_enrich/policy/bx-hunt-task-policy/_execute")
+    status, body = es.request("PUT", f"/_enrich/policy/{enrich_policy('hunt-task')}/_execute")
     print(f"Enrich execute → {status} {body}")
 
 

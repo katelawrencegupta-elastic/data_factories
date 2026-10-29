@@ -9,10 +9,12 @@ import random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from data_factories.tenant import TENANT, alias, dataset, ndjson_logs, poc_tag
+
 TARGET_IP = "10.40.12.88"
 ACCOUNTS = [
-    ("111122223333", "BX-Prod-Security", "vpc-0a1b2c3d"),
-    ("444455556666", "BX-Shared-Services", "vpc-0a1b2c3d"),
+    ("111122223333", "Customer-Prod-Security", "vpc-0a1b2c3d"),
+    ("444455556666", "Customer-Shared-Services", "vpc-0a1b2c3d"),
 ]
 DESTS = [
     ("10.40.20.11", "C1", 40),
@@ -48,10 +50,10 @@ def vpcflow_doc(
 ) -> dict:
     return {
         "@timestamp": _ts(minutes_ago),
-        "data_stream": {"type": "logs", "dataset": "bx.aws_vpcflow", "namespace": "default"},
+        "data_stream": {"type": "logs", "dataset": dataset('aws_vpcflow'), "namespace": "default"},
         "event": {
             "category": ["network"],
-            "dataset": "bx.aws_vpcflow",
+            "dataset": dataset('aws_vpcflow'),
             "action": "accept",
             "kind": "event",
             "type": ["connection"],
@@ -69,24 +71,24 @@ def vpcflow_doc(
             "region": "us-east-1",
         },
         "related": {"ip": [src, dest]},
-        "bx": {
+        TENANT: {
             "aws": {
                 "vpc_id": vpc_id,
                 "community": community,
-                "flow_index_alias": "bx_app_aws_vpcflowlogs",
+                "flow_index_alias": alias("app", "aws", "vpcflowlogs"),
             }
         },
-        "tags": ["bx-poc", "aws-blast-radius", "vpcflow"],
+        "tags": [poc_tag(), "aws-blast-radius", "vpcflow"],
     }
 
 
 def cloudtrail_doc(minutes_ago: int, *, arn: str, command: str, weight: float, account_id: str) -> dict:
     return {
         "@timestamp": _ts(minutes_ago),
-        "data_stream": {"type": "logs", "dataset": "bx.aws_cloudtrail", "namespace": "default"},
+        "data_stream": {"type": "logs", "dataset": dataset('aws_cloudtrail'), "namespace": "default"},
         "event": {
             "category": ["iam"],
-            "dataset": "bx.aws_cloudtrail",
+            "dataset": dataset('aws_cloudtrail'),
             "action": command,
             "kind": "event",
             "provider": "cloudtrail.amazonaws.com",
@@ -97,15 +99,15 @@ def cloudtrail_doc(minutes_ago: int, *, arn: str, command: str, weight: float, a
             "provider": "aws",
             "region": "us-east-1",
         },
-        "bx": {
+        TENANT: {
             "aws": {
                 "arn": arn,
                 "api_command": command,
                 "centrality": {"weight": weight},
-                "trail_index_alias": "bx_app_aws_prod",
+                "trail_index_alias": alias("app", "aws", "prod"),
             }
         },
-        "tags": ["bx-poc", "aws-blast-radius", "cloudtrail"],
+        "tags": [poc_tag(), "aws-blast-radius", "cloudtrail"],
     }
 
 
@@ -177,8 +179,8 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 )
 
-    flow_path = OUT / "logs-bx.aws_vpcflow.ndjson"
-    trail_path = OUT / "logs-bx.aws_cloudtrail.ndjson"
+    flow_path = OUT / ndjson_logs('aws_vpcflow')
+    trail_path = OUT / ndjson_logs('aws_cloudtrail')
     flow_path.write_text("\n".join(json.dumps(d) for d in flows) + "\n")
     trail_path.write_text("\n".join(json.dumps(d) for d in trails) + "\n")
     print(f"Wrote {len(flows)} vpcflow → {flow_path}")

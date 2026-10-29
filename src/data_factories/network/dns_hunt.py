@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P0 data factories for the BX DNS Hunt use case.
+"""P0 data factories for the DNS Hunt use case.
 
 Usage:
   df-dns-hunt --hunt-ips /path/to/hunt_task_ips.json --env-file /path/to/.env
@@ -18,9 +18,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from data_factories.es import Api, load_env, require_es
+from data_factories.tenant import (
+    TENANT,
+    dataset,
+    demo_host,
+    enrich_policy,
+    index_name,
+    poc_tag,
+    stream_name,
+)
 
-DNS_DS = "logs-bx.dns-default"
-NETWORK_DS = "logs-bx.network-default"
+DNS_DS = stream_name('logs', 'dns')
+NETWORK_DS = stream_name('logs', 'network')
 SEED_BLOCKED = {"src": "10.226.65.68", "dest": "110.191.200.13"}
 SEED_FLOW = {"dest": "10.191.200.135", "dest_port": 10000}
 
@@ -28,7 +37,7 @@ BENIGN = [
     "update.microsoft.com",
     "login.microsoftonline.com",
     "ocsp.digicert.com",
-    "cdn.blackstone.com",
+    "cdn.customer.example",
     "ntp.ubuntu.com",
     "watson.telemetry.microsoft.com",
 ]
@@ -55,19 +64,19 @@ def choose_query(profile: str | None = None) -> str:
 def dns_doc(src_ip: str, query: str) -> dict:
     return {
         "@timestamp": datetime.now(timezone.utc).isoformat(),
-        "data_stream": {"type": "logs", "dataset": "bx.dns", "namespace": "default"},
+        "data_stream": {"type": "logs", "dataset": dataset('dns'), "namespace": "default"},
         "event": {
             "category": ["network"],
-            "dataset": "bx.dns",
+            "dataset": dataset('dns'),
             "kind": "event",
             "type": ["protocol"],
         },
         "dns": {"question": {"name": query, "type": "A"}},
         "source": {"ip": src_ip},
         "destination": {"ip": random.choice(DESTS)},
-        "host": {"name": f"bx-dc-{random.randint(1, 3)}"},
+        "host": {"name": f"{demo_host('dc')}-{random.randint(1, 3)}"},
         "observer": {"vendor": "Microsoft", "product": "Windows DNS"},
-        "tags": ["bx-poc", "dns-factory"],
+        "tags": [poc_tag(), 'dns-factory'],
     }
 
 
@@ -103,7 +112,7 @@ def factory_windows_dns(es: Api, hunt_ips: list[str], n: int = 120) -> None:
 
 
 def factory_pan_traffic(es: Api, n: int = 40) -> None:
-    """P1: Palo Alto-like ECS network events (steve_dashboard traffic seeds)."""
+    """P1: Palo Alto-like ECS network events (demo traffic seeds)."""
     es.request("PUT", f"/_data_stream/{NETWORK_DS}")
     now = datetime.now(timezone.utc)
     docs = []
@@ -111,10 +120,10 @@ def factory_pan_traffic(es: Api, n: int = 40) -> None:
     def pan(**kw):
         return {
             "@timestamp": kw.get("ts", now.isoformat()),
-            "data_stream": {"type": "logs", "dataset": "bx.network", "namespace": "default"},
+            "data_stream": {"type": "logs", "dataset": dataset('network'), "namespace": "default"},
             "event": {
                 "category": ["network"],
-                "dataset": "bx.network",
+                "dataset": dataset('network'),
                 "kind": "event",
                 "type": ["connection"],
                 "action": kw.get("action", "allow"),
@@ -132,8 +141,8 @@ def factory_pan_traffic(es: Api, n: int = 40) -> None:
                 "product": "PAN-OS",
                 "ingress": {"interface": {"name": kw.get("iface", "ethernet1/1")}},
             },
-            "cloud": {"account": {"id": "bx-aws-prod-001"}},
-            "tags": ["bx-poc", "pan-traffic-factory"],
+            "cloud": {"account": {"id": f"{TENANT}-aws-prod-001"}},
+            "tags": [poc_tag(), 'pan-traffic-factory'],
         }
 
     docs.append(
@@ -235,8 +244,8 @@ def refresh_hunt(es: Api, hunt_ips: list[str]) -> None:
     }
     now = datetime.now(timezone.utc).isoformat()
     for index, settings in [
-        ("bx-hunt-task", {}),
-        ("bx-hunt-task-lookup", {"settings": {"index": {"mode": "lookup"}}}),
+        (index_name('hunt-task'), {}),
+        (index_name('hunt-task-lookup'), {'settings': {'index': {'mode': 'lookup'}}}),
     ]:
         body = {"mappings": mappings, **settings}
         es.request("PUT", f"/{index}", body)
@@ -247,7 +256,7 @@ def refresh_hunt(es: Api, hunt_ips: list[str]) -> None:
                 json.dumps(
                     {
                         "ip": ip,
-                        "hunt_name": "steve_dashboard_hunt_task",
+                        "hunt_name": "demo_hunt_task",
                         "source": "splunk_kvstore:hunt_task",
                         "@timestamp": now,
                     }
@@ -265,16 +274,16 @@ def refresh_hunt(es: Api, hunt_ips: list[str]) -> None:
 
     es.request(
         "PUT",
-        "/_enrich/policy/bx-hunt-task-policy",
+        f"/_enrich/policy/{enrich_policy('hunt-task')}",
         {
             "match": {
-                "indices": "bx-hunt-task",
+                "indices": index_name('hunt-task'),
                 "match_field": "ip",
                 "enrich_fields": ["ip", "hunt_name", "source"],
             }
         },
     )
-    status, resp = es.request("PUT", "/_enrich/policy/bx-hunt-task-policy/_execute")
+    status, resp = es.request("PUT", f"/_enrich/policy/{enrich_policy('hunt-task')}/_execute")
     print(f"hunt_ioc_factory: enrich execute → {status} {resp}")
 
 

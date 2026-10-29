@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synthetic events for BX IOC Threat Hunt dashboard panels."""
+"""Synthetic events for IOC Threat Hunt dashboard panels."""
 
 from __future__ import annotations
 
@@ -8,6 +8,15 @@ import json
 import random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+from data_factories.tenant import (
+    TENANT,
+    alias,
+    dataset,
+    lookup_file,
+    ndjson_logs,
+    poc_tag,
+)
 
 IOC_IP = "203.0.113.77"
 IOC_DOMAIN = "evil-c2.example"
@@ -22,10 +31,10 @@ def network_doc(minutes_ago: int, *, hit: bool) -> dict:
     dest = IOC_IP if hit else NOISE_IP
     return {
         "@timestamp": _ts(minutes_ago),
-        "data_stream": {"type": "logs", "dataset": "bx.ioc_hunt", "namespace": "default"},
+        "data_stream": {"type": "logs", "dataset": dataset('ioc_hunt'), "namespace": "default"},
         "event": {
             "category": ["network"],
-            "dataset": "bx.ioc_hunt.network",
+            "dataset": dataset('ioc_hunt') + '.network',
             "action": "allow",
             "outcome": "success",
             "kind": "event",
@@ -40,8 +49,8 @@ def network_doc(minutes_ago: int, *, hit: bool) -> dict:
             "ip": ["10.20.4.18", dest],
             "hosts": [IOC_DOMAIN if hit else "cdn.example"],
         },
-        "tags": ["bx-poc", "ioc-hunt", "network"] + (["ioc-hit"] if hit else []),
-        "bx": {"hunt": {"channel": "network_traffic", "index_alias": "bx_sec_paloalto_prod"}},
+        "tags": [poc_tag(), "ioc-hunt", "network"] + (["ioc-hit"] if hit else []),
+        TENANT: {'hunt': {'channel': 'network_traffic', 'index_alias': alias('sec', 'paloalto', 'prod')}},
     }
 
 
@@ -50,10 +59,10 @@ def web_doc(minutes_ago: int, *, hit: bool) -> dict:
     host = IOC_DOMAIN if hit else "cdn.example"
     return {
         "@timestamp": _ts(minutes_ago),
-        "data_stream": {"type": "logs", "dataset": "bx.ioc_hunt", "namespace": "default"},
+        "data_stream": {"type": "logs", "dataset": dataset('ioc_hunt'), "namespace": "default"},
         "event": {
             "category": ["web"],
-            "dataset": "bx.ioc_hunt.web",
+            "dataset": dataset('ioc_hunt') + '.web',
             "action": "url-access",
             "kind": "event",
         },
@@ -63,8 +72,8 @@ def web_doc(minutes_ago: int, *, hit: bool) -> dict:
         "rule": {"name": "url-block" if hit else "allow"},
         "user": {"name": "jdoe"},
         "related": {"ip": ["10.20.4.18"], "hosts": [host]},
-        "tags": ["bx-poc", "ioc-hunt", "web"] + (["ioc-hit"] if hit else []),
-        "bx": {"hunt": {"channel": "web", "index_alias": "bx_sec_zscaler_prod"}},
+        "tags": [poc_tag(), "ioc-hunt", "web"] + (["ioc-hit"] if hit else []),
+        TENANT: {'hunt': {'channel': 'web', 'index_alias': alias('sec', 'zscaler', 'prod')}},
     }
 
 
@@ -72,10 +81,10 @@ def auth_doc(minutes_ago: int, *, hit: bool) -> dict:
     src = IOC_IP if hit else "10.30.1.5"
     return {
         "@timestamp": _ts(minutes_ago),
-        "data_stream": {"type": "logs", "dataset": "bx.ioc_hunt", "namespace": "default"},
+        "data_stream": {"type": "logs", "dataset": dataset('ioc_hunt'), "namespace": "default"},
         "event": {
             "category": ["authentication"],
-            "dataset": "bx.ioc_hunt.auth",
+            "dataset": dataset('ioc_hunt') + '.auth',
             "action": "logon-failed" if hit else "logon-success",
             "outcome": "failure" if hit else "success",
             "kind": "event",
@@ -86,8 +95,8 @@ def auth_doc(minutes_ago: int, *, hit: bool) -> dict:
         "host": {"hostname": "dc01"},
         "user": {"name": "admin"},
         "related": {"ip": [src, "10.1.8.12"], "hosts": ["dc01.corp.local"]},
-        "tags": ["bx-poc", "ioc-hunt", "authentication"] + (["ioc-hit"] if hit else []),
-        "bx": {"hunt": {"channel": "authentication", "index_alias": "bx_sec_msad_prod"}},
+        "tags": [poc_tag(), "ioc-hunt", "authentication"] + (["ioc-hit"] if hit else []),
+        TENANT: {'hunt': {'channel': 'authentication', 'index_alias': alias('sec', 'msad', 'prod')}},
     }
 
 
@@ -95,10 +104,10 @@ def vpc_doc(minutes_ago: int, *, hit: bool) -> dict:
     dest = IOC_IP if hit else NOISE_IP
     return {
         "@timestamp": _ts(minutes_ago),
-        "data_stream": {"type": "logs", "dataset": "bx.ioc_hunt", "namespace": "default"},
+        "data_stream": {"type": "logs", "dataset": dataset('ioc_hunt'), "namespace": "default"},
         "event": {
             "category": ["network"],
-            "dataset": "bx.ioc_hunt.vpcflow",
+            "dataset": dataset('ioc_hunt') + '.vpcflow',
             "action": "accept",
             "kind": "event",
         },
@@ -106,8 +115,8 @@ def vpc_doc(minutes_ago: int, *, hit: bool) -> dict:
         "destination": {"ip": dest},
         "observer": {"vendor": "AWS", "product": "VPC Flow", "hostname": "vpc-fw-a"},
         "related": {"ip": ["10.20.4.18", dest]},
-        "tags": ["bx-poc", "ioc-hunt", "vpcflow"] + (["ioc-hit"] if hit else []),
-        "bx": {"hunt": {"channel": "network_traffic", "index_alias": "bx_app_aws_vpcflowlogs"}},
+        "tags": [poc_tag(), "ioc-hunt", "vpcflow"] + (["ioc-hit"] if hit else []),
+        TENANT: {'hunt': {'channel': 'network_traffic', 'index_alias': alias('app', 'aws', 'vpcflowlogs')}},
     }
 
 
@@ -122,7 +131,7 @@ def notables() -> list[dict]:
             "notable.name": "Outbound C2 Communication",
             "notable.severity": "high",
             "notable.link": "/app/security/alerts?kuery=ALERT-10482",
-            "tags": ["bx-poc", "ioc-hunt", "notable"],
+            "tags": [poc_tag(), "ioc-hunt", "notable"],
         },
         {
             "@timestamp": _ts(90),
@@ -133,7 +142,7 @@ def notables() -> list[dict]:
             "notable.name": "Suspicious Domain Access",
             "notable.severity": "medium",
             "notable.link": "/app/security/alerts?kuery=ALERT-10471",
-            "tags": ["bx-poc", "ioc-hunt", "notable"],
+            "tags": [poc_tag(), "ioc-hunt", "notable"],
         },
     ]
 
@@ -159,9 +168,9 @@ def main(argv: list[str] | None = None) -> int:
         pick = rng.choice([network_doc, web_doc, auth_doc, vpc_doc])
         docs.append(pick(m, hit=False))
 
-    hunt_path = OUT / "logs-bx.ioc_hunt.ndjson"
+    hunt_path = OUT / ndjson_logs('ioc_hunt')
     hunt_path.write_text("\n".join(json.dumps(d) for d in docs) + "\n")
-    not_path = OUT / "bx-ioc-notables.ndjson"
+    not_path = OUT / lookup_file('ioc-notables')
     not_path.write_text("\n".join(json.dumps(d) for d in notables()) + "\n")
     print(f"Wrote {hunt_path} ({len(docs)} docs)")
     print(f"Wrote {not_path} ({len(notables())} docs)")
