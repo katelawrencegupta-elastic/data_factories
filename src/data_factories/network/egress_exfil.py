@@ -12,7 +12,7 @@ from pathlib import Path
 from data_factories.tenant import (
     TENANT,
     alias,
-    dataset,
+    dataset as tenant_dataset,
     lookup_file,
     ndjson_logs,
     poc_tag,
@@ -65,7 +65,7 @@ def traffic_doc(
 ) -> dict:
     return {
         "@timestamp": _ts(hours_ago),
-        "data_stream": {"type": "logs", "dataset": dataset('network_egress'), "namespace": "default"},
+        "data_stream": {"type": "logs", "dataset": tenant_dataset("network_egress"), "namespace": "default"},
         "event": {
             "category": ["network"],
             "dataset": dataset,
